@@ -58,7 +58,7 @@ def main(page: ft.Page):
     
     title_painel = ft.Container(
         content=txt_painel,
-        alignment=ft.alignment.center,
+        alignment=ft.Alignment.CENTER,
         padding=50
     )
 
@@ -90,7 +90,7 @@ def main(page: ft.Page):
             alignment=ft.MainAxisAlignment.START,
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         ),
-        alignment=ft.alignment.top_center,
+        alignment=ft.Alignment.TOP_CENTER,
         bgcolor="#242424",
         margin=1,
         border_radius=5,
@@ -109,4 +109,4 @@ def main(page: ft.Page):
         camadas
     )
 
-ft.app(target=main)
+ft.run(main)
