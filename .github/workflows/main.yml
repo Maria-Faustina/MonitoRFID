@@ -1,7 +1,7 @@
-name: Gerar APK Pymonitor
+name: Gerar APK MonitorRFID
 
 on:
-  workflow_dispatch: # Permite iniciar a compilação com um clique
+  workflow_dispatch:
 
 jobs:
   build-apk:
@@ -10,7 +10,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configurar Java Estável
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5   # Atualizado para v5 para remover o aviso amarelo
         with:
           distribution: 'zulu'
           java-version: '17'
