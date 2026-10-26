@@ -1,7 +1,7 @@
 name: Gerar APK MonitorRFID
 
 on:
-  workflow_dispatch: # Permite iniciar a compilação manualmente com um clique
+  workflow_dispatch:
 
 jobs:
   build-apk:
@@ -30,12 +30,8 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.2'
-         - name: Forçar a Compilação do APK
-        run: |
-          flutter config --no-analytics
-          flet build apk --yes --verbose
 
       - name: Forçar a Compilação do APK
         run: |
           flutter config --no-analytics
-          flet build apk --verbose
+          flet build apk --yes --verbose
