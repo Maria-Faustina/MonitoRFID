@@ -34,10 +34,15 @@ jobs:
       - name: Forçar a Compilação do APK
         run: |
           flutter config --no-analytics
-          # Limpa caches antigos do servidor do GitHub
+          # 1. Garante que limpamos qualquer cache temporário gerado no Git
           flet clean
-          # Executa o build (ele vai ler o flet.toml automaticamente)
-          flet build apk --yes --verbose
+          
+          # 2. Copia o seu logo para a raiz padrão que o Flet exige no Linux (icon.png)
+          mkdir -p assets
+          cp assets/icons/logo.png assets/icon.png
+          
+          # 3. Força as propriedades via injeção direta de linha de comando CLI
+          flet build apk --yes --verbose --android-adaptive-icon-background "#0E0E55"
 
       - name: Disponibilizar o arquivo APK para Download
         uses: actions/upload-artifact@v4
