@@ -21,29 +21,39 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Instalar dependencias e ImageMagick
+      - name: Instalar dependencias do Flet
         run: |
           python -m pip install --upgrade pip
-          pip install flet
-          # Comando corrigido sem o parâmetro '-p'
-          sudo apt-get update
-          sudo apt-get install imagemagick -y
+          pip install flet pillow
 
       - name: Configurar o Flutter SDK
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.2'
 
+      - name: Ajustar e Forçar o Ícone em PNG
+        run: |
+          # Cria a pasta assets se não existir
+          mkdir -p assets
+          
+          # Script Python que abre sua logo e salva como um PNG quadrado perfeito (512x512)
+          python -c "
+          from PIL import Image
+          import os
+          if os.path.exists('assets/icons/logo.png'):
+              img = Image.open('assets/icons/logo.png').convert('RGBA')
+              img = img.resize((512, 512), Image.Resampling.LANCZOS)
+              img.save('assets/icon.png', 'PNG')
+              print('Ícone processado com sucesso em assets/icon.png')
+          else:
+              print('AVISO: assets/icons/logo.png não foi encontrada!')
+          "
+
       - name: Forçar a Compilação do APK
         run: |
           flutter config --no-analytics
           flet clean
-          
-          # Converte a sua logo para PNG Quadrado de 512x512 pixels
-          mkdir -p assets
-          convert assets/icons/logo.png -resize 512x512\! assets/icon.png
-          
-          # Executa o build com o ícone forçado e corrigido
+          # Executa o build com o ícone embutido e a cor de fundo adaptativa do Android
           flet build apk --yes --verbose --android-adaptive-icon-background "#0E0E55"
 
       - name: Disponibilizar o arquivo APK para Download
