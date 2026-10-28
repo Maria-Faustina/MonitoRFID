@@ -2,7 +2,7 @@
 name = "MonitorRFID"
 version = "1.0.0"
 description = "Monitor RFID com Flet"
-product = MonitorRFID
+product = "MonitorRFID"
 dependencies = [
     "flet>=0.25.0",
 ]
