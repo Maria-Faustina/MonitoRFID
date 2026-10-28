@@ -1,7 +1,8 @@
 [project]
 name = "MonitorRFID"
-version = "0.1.0"
+version = "1.0.0"
 description = "Monitor RFID com Flet"
+product = MonitorRFID
 dependencies = [
     "flet>=0.25.0",
 ]
