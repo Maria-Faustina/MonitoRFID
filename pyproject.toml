@@ -3,6 +3,9 @@ name = "MonitorRFID"
 version = "1.0.0"
 description = "Monitor RFID com Flet"
 product = "MonitorRFID"
+android = "assets/icons/logo.png"
+ios = "assets/icons/logo.png"
+web = "assets/icons/logo.png"
 dependencies = [
     "flet>=0.25.0",
 ]
