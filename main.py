@@ -116,7 +116,7 @@ def main(page: ft.Page):
                         controls=[
                             ft.Text(uid, color="#dedee7", expand=1, size=12, text_align=ft.TextAlign.CENTER),
                             ft.Text(status, color=cor_status, expand=2, size=13, text_align=ft.TextAlign.CENTER),
-                            ft.Text(dth, color="#dedee7", expand=1, size=13, text_align=ft.TextAlign.CENTER),
+                            ft.Text(dth, color="#dedee7", expand=1, size=12, text_align=ft.TextAlign.CENTER),
                         ],
                         alignment=ft.MainAxisAlignment.SPACE_AROUND,
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
