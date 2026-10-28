@@ -21,10 +21,13 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Instalar dependencias do Flet
+      - name: Instalar dependencias e ImageMagick
         run: |
           python -m pip install --upgrade pip
           pip install flet
+          # Instala ferramenta do Linux para converter imagens na marra
+          sudo apt-get update
+          sudo apt-get install -p imagemagick -y
 
       - name: Configurar o Flutter SDK
         uses: subosito/flutter-action@v2
@@ -34,14 +37,13 @@ jobs:
       - name: Forçar a Compilação do APK
         run: |
           flutter config --no-analytics
-          # 1. Garante que limpamos qualquer cache temporário gerado no Git
           flet clean
           
-          # 2. Copia o seu logo para a raiz padrão que o Flet exige no Linux (icon.png)
+          # FORÇAR FORMATAÇÃO: Converte sua logo para PNG Quadrado 512x512 perfeito
           mkdir -p assets
-          cp assets/icons/logo.png assets/icon.png
+          convert assets/icons/logo.png -resize 512x512\! assets/icon.png
           
-          # 3. Força as propriedades via injeção direta de linha de comando CLI
+          # Executa o build com o ícone forçado e corrigido
           flet build apk --yes --verbose --android-adaptive-icon-background "#0E0E55"
 
       - name: Disponibilizar o arquivo APK para Download
