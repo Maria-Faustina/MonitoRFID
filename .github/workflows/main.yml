@@ -25,9 +25,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install flet
-          # Instala ferramenta do Linux para converter imagens na marra
+          # Comando corrigido sem o parâmetro '-p'
           sudo apt-get update
-          sudo apt-get install -p imagemagick -y
+          sudo apt-get install imagemagick -y
 
       - name: Configurar o Flutter SDK
         uses: subosito/flutter-action@v2
@@ -39,7 +39,7 @@ jobs:
           flutter config --no-analytics
           flet clean
           
-          # FORÇAR FORMATAÇÃO: Converte sua logo para PNG Quadrado 512x512 perfeito
+          # Converte a sua logo para PNG Quadrado de 512x512 pixels
           mkdir -p assets
           convert assets/icons/logo.png -resize 512x512\! assets/icon.png
           
