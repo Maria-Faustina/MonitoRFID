@@ -1,3 +1,5 @@
 [tool.flet]
 app_title = "MonitoRFID"
-icon = "assets/icons/logo.png"
+android = "assets/icons/logo.png"
+ios = "assets/icons/logo.png"
+web = "assets/icons/logo.png"
