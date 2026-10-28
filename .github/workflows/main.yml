@@ -34,7 +34,12 @@ jobs:
       - name: Forçar a Compilação do APK
         run: |
           flutter config --no-analytics
-          flet build apk --yes --verbose
+          # 1. Limpa resquícios de compilações anteriores
+          flet clean 
+          
+          # 2. Comando corrigido passando o caminho exato da sua foto.
+          # AJUSTE: Mude "assets/icons/logo_trans.png" para o caminho real da imagem do seu ícone!
+          flet build apk --yes --verbose --android-adaptive-icon-background "#0E0E55"
 
       - name: Disponibilizar o arquivo APK para Download
         uses: actions/upload-artifact@v4
