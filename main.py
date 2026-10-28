@@ -258,7 +258,7 @@ def main(page: ft.Page):
                 spacing=10
             ),
             width=300,
-            height= 380,
+            height= 400,
             padding=30,
             border_radius=12,
             blur=ft.Blur(sigma_x=10, sigma_y=10, tile_mode=ft.BlurTileMode.MIRROR),
