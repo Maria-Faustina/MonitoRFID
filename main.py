@@ -2,7 +2,7 @@ import flet as ft
 
 
 def main(page: ft.Page):
-    page.title = "Pymonitor"
+    page.title = "MonitorRFID"
     page.bgcolor = "#0E0E55"
     page.padding = 0
     page.spacing = 0
@@ -55,7 +55,7 @@ def main(page: ft.Page):
         title_painel = ft.Container(
             content=txt_painel,
             alignment=ft.Alignment.CENTER,
-            padding=50,
+            padding=20,
         )
 
         linha_principal = ft.Container(
@@ -68,17 +68,25 @@ def main(page: ft.Page):
             border_radius=3,
             padding=3,
         )
-
-        btn_liberar = ft.Button(
-            content="Liberar acesso",
-            icon=ft.Icons.LOCK_OPEN_SHARP,
-            color="#5ed97c",
-            style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=5)),
+        ft.Container(height=50)
+        btn_liberar = ft.Container(
+            content=ft.Button(
+                content="Liberar acesso",
+                icon=ft.Icons.LOCK_OPEN_SHARP,
+                color="#5ed97c",
+                style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=5)),
+            ),
+            padding=10,
+            alignment=ft.Alignment.CENTER,
         )
-
-        btn_voltar = ft.IconButton(
-            icon=ft.Icons.ARROW_BACK,
-            on_click=tela_login,
+        btn_voltar = ft.Row(
+            controls=[
+                ft.IconButton(
+                    icon=ft.Icons.ARROW_BACK,
+                    on_click=tela_login,
+                )
+            ],
+            alignment=ft.MainAxisAlignment.START,
         )
         lista_acessos = [
             ["A3 B2 C5 D1", "Liberado", "25/10/2026 16:15"],
@@ -88,8 +96,13 @@ def main(page: ft.Page):
             ["7B 9A 2C 4D", "Negado", "25/10/2026 16:24"],
         ]
 
-        lista_dados = ft.ListView()
+        lista_dados = ft.ListView(padding=0, spacing=0)
         for uid, status, dth in lista_acessos:
+            if status == "Liberado":
+                cor_status = "#5ed97c"
+            else:
+                cor_status = "#ff6b6b"
+
             lista_dados.controls.append(
                 ft.Container(
                     content=ft.Row(
@@ -103,7 +116,7 @@ def main(page: ft.Page):
                             ),
                             ft.Text(
                                 status,
-                                color="#f0f0fc",
+                                color=cor_status,
                                 expand=2,
                                 size=13,
                                 text_align=ft.TextAlign.CENTER,
@@ -127,13 +140,8 @@ def main(page: ft.Page):
             )
         painel_fundo = ft.Container(
             content=ft.Column(
-                controls=[
-                    txt_registro,
-                    linha_principal,
-                    lista_dados,
-                    btn_liberar,
-                ],
-                alignment=ft.MainAxisAlignment.START,
+                controls=[txt_registro, linha_principal, lista_dados],
+                alignment=ft.MainAxisAlignment.CENTER,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             ),
             alignment=ft.Alignment.TOP_CENTER,
@@ -141,12 +149,19 @@ def main(page: ft.Page):
             margin=1,
             padding=5,
             border_radius=5,
+            width=330,
+            height=330,
         )
 
         page.views.append(
             ft.View(
                 route="/tela_home",
-                controls=[title_painel, painel_fundo, btn_voltar],
+                controls=[
+                    title_painel,
+                    painel_fundo,
+                    btn_liberar,
+                    btn_voltar,
+                ],
                 bgcolor="#ABDCDC",
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 vertical_alignment=ft.MainAxisAlignment.CENTER,
@@ -166,6 +181,7 @@ def main(page: ft.Page):
                         weight="bold",
                         color="#f0f0fc",
                     ),
+                    ft.Container(height=10),
                     ft.TextField(
                         label="Insira seu nome de usuario",
                         label_style=ft.TextStyle(size=10),
@@ -175,33 +191,36 @@ def main(page: ft.Page):
                     ),
                     ft.TextField(
                         label="Insira sua senha",
+                        password=True,
+                        can_reveal_password=True,
                         bgcolor="#f0f0fc",
                         label_style=ft.TextStyle(size=10),
                         width=200,
                         height=38,
                     ),
+                    ft.Container(height=10),
                     ft.Button(
                         content="Fazer login",
                         on_click=tela_home,
                     ),
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                alignment=ft.MainAxisAlignment.END,
+                alignment=ft.MainAxisAlignment.CENTER,
                 spacing=20,
             ),
-            width=340,
-            height=350,
-            padding=50,
+            width=300,
+            height=330,
+            padding=30,
             border_radius=12,
-            bgcolor="#021433",
-            alignment=ft.Alignment.BOTTOM_CENTER,
+            bgcolor="#0F3372",
+            alignment=ft.Alignment.CENTER,
         )
 
         page.views.append(
             ft.View(
                 route="/tela_login",
                 controls=[painel_login],
-                bgcolor="#0C0661",
+                bgcolor="#ABDCDC",
                 vertical_alignment=ft.MainAxisAlignment.CENTER,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             )
