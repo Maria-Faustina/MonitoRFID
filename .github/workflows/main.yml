@@ -36,7 +36,6 @@ jobs:
           flutter config --no-analytics
           flet build apk --yes --verbose
 
-      # ETAPA ADICIONADA: Faz o botão de download do APK aparecer na tela para você
       - name: Disponibilizar o arquivo APK para Download
         uses: actions/upload-artifact@v4
         with:
