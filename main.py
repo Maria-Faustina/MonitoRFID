@@ -87,13 +87,14 @@ def main(page: ft.Page):
             ),
             alignment=ft.Alignment.CENTER,
         )
-        btn_voltar = ft.Container(
-            left=0,
-            bottom=0,
-            content=ft.IconButton(
-                icon=ft.Icons.ARROW_BACK,
-                on_click=lambda: asyncio.create_task(page.push_route("/tela_login")),
-            ),
+        btn_voltar = ft.Row(
+            controls=[
+                ft.IconButton(
+                    icon=ft.Icons.ARROW_BACK,
+                    on_click=lambda: asyncio.create_task(page.push_route("/tela_login")),
+                )
+            ],
+            alignment=ft.MainAxisAlignment.START,
         )
         lista_acessos = [
             ["A3 B2 C5 D1", "Liberado", "25/10/2026 16:15"],
@@ -151,17 +152,10 @@ def main(page: ft.Page):
             ft.View(
                 route="/tela_home",
                 controls=[
-                    ft.Stack(
-                        expand=True,
-                        controls=[
-                            ft.Column(
-                                controls=[title_painel, painel_fundo, btn_liberar],
-                                alignment=ft.MainAxisAlignment.CENTER,
-                                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                            ),
-                            btn_voltar,
-                        ],
-                    )
+                    title_painel,
+                    painel_fundo,
+                    btn_liberar,
+                    btn_voltar,
                 ],
                 bgcolor = "#ABDCDC",
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -177,7 +171,7 @@ def main(page: ft.Page):
         async def validacao_de_campo():
             if campo_email.value and campo_senha.value:
                 
-                snack_bar = ft.SnackBar(content=ft.Text("Login Realizado com sucesso!", color="#dedee7"),
+                snack_bar = ft.SnackBar(content=ft.Text("Login realizado com sucesso!", color="#dedee7"),
                 bgcolor="green",
                 duration=1000
                 )
@@ -251,6 +245,7 @@ def main(page: ft.Page):
                         content="Fazer Login",
                         on_click=validacao_de_campo,
                         bgcolor="#f0f0fc",
+                        color="#030345",
                         width=150,
                         height=35
                     )
