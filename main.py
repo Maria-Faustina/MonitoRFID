@@ -91,6 +91,7 @@ def main(page: ft.Page):
             controls=[
                 ft.IconButton(
                     icon=ft.Icons.ARROW_BACK,
+                    icon_color="#263A6D",
                     on_click=lambda: asyncio.create_task(page.push_route("/tela_login")),
                 )
             ],
@@ -116,7 +117,7 @@ def main(page: ft.Page):
                     content=ft.Row(
                         controls=[
                             ft.Text(uid, color="#dedee7", expand=1, size=12, text_align=ft.TextAlign.CENTER),
-                            ft.Text(status, color=cor_status, expand=2, size=13, text_align=ft.TextAlign.CENTER),
+                            ft.Text(status, color=cor_status, expand=2, size=12, text_align=ft.TextAlign.CENTER),
                             ft.Text(dth, color="#dedee7", expand=1, size=12, text_align=ft.TextAlign.CENTER),
                         ],
                         alignment=ft.MainAxisAlignment.SPACE_AROUND,
