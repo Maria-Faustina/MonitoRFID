@@ -3,7 +3,7 @@ name = "MonitorRFID"
 version = "1.0.0"
 description = "Monitor RFID com Flet"
 dependencies = [
-    "flet==0.25.0",   # troque pela versão do pip show flet
+    "flet==1.0.5",   # troque pela versão do pip show flet
     "requests",
     "python-socketio[client]",
     "websocket-client",
