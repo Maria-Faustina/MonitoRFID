@@ -12,3 +12,4 @@ dependencies = [
 [tool.flet]
 product = "MonitorRFID"
 app_title = "MonitorRFID"
+icon = "assets/icons/logo.png"
