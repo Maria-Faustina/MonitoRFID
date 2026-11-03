@@ -24,7 +24,7 @@ jobs:
       - name: Instalar dependencias do Flet
         run: |
           python -m pip install --upgrade pip
-          pip install flet pillow aiohttp
+          pip install flet pillow aiohttp requests
 
       - name: Configurar o Flutter SDK
         uses: subosito/flutter-action@v2
@@ -56,6 +56,13 @@ jobs:
         run: |
           flutter config --no-analytics
           flet clean
+          
+          # Cria o arquivo de requerimentos que o Flet obrigatoriamente lê ao compilar
+          echo "flet" > requirements.txt
+          echo "requests" >> requirements.txt
+          echo "aiohttp" >> requirements.txt
+          echo "pillow" >> requirements.txt
+
           # Executa o build com o ícone embutido e a cor de fundo adaptativa do Android
           flet build apk --yes --verbose --android-adaptive-icon-background "#0E0E55"
 
