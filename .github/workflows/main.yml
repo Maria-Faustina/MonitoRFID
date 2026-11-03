@@ -55,15 +55,24 @@ jobs:
       - name: Forçar a Compilação do APK
         run: |
           flutter config --no-analytics
-          flet clean
           
-          # Cria o arquivo de requerimentos que o Flet obrigatoriamente lê ao compilar para o Android
+          # Remove caches anteriores para evitar lixo de build que falhou
+          flet clean
+          rm -rf build/
+          rm -rf .pytest_cache/
+
+          # Cria o arquivo de requerimentos que o Flet lê caso não ache pyproject
           echo "flet" > requirements.txt
           echo "requests" >> requirements.txt
           echo "aiohttp" >> requirements.txt
           echo "pillow" >> requirements.txt
           echo "python-socketio" >> requirements.txt
           echo "websocket-client" >> requirements.txt
+
+          # Se o projeto possuir um pyproject.toml, injeta forçadamente a tabela de dependências mobile
+          if [ -f "pyproject.toml" ]; then
+            echo -e "\n[tool.flet.dependencies]\nrequests = \"*\"\naiohttp = \"*\"\npillow = \"*\"\npython-socketio = \"*\"\nwebsocket-client = \"*\"" >> pyproject.toml
+          fi
 
           # Executa o build com o ícone embutido e a cor de fundo adaptativa do Android
           flet build apk --yes --verbose --android-adaptive-icon-background "#0E0E55"
