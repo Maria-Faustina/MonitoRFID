@@ -7,7 +7,7 @@ dependencies = [
     "requests",
     "python-socketio[client]",
     "websocket-client",
-    "time"
+    "time",
 ]
  
 [tool.flet]
