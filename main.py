@@ -3,6 +3,7 @@ import threading
 import socket
 import flet as ft
 import requests
+import time
 import socketio
 
 # O app tenta descobrir automaticamente o servidor na mesma rede Wi-Fi.
@@ -14,44 +15,87 @@ DISCOVERY_REQUEST = b"MONITORRFID_DISCOVER"
 DISCOVERY_RESPONSE_PREFIX = "MONITORRFID_SERVER|"
 
 
-def descobrir_servidor():
-    """Procura o app.py por UDP broadcast na rede local."""
+def _destinos_broadcast():
+    """Broadcast geral + broadcast da sub-rede (ex.: 192.168.0.255).
+
+    No Android o 255.255.255.255 costuma ser descartado em alguns celulares e
+    roteadores; o broadcast da sub-rede costuma passar.
+    """
+    destinos = ["255.255.255.255"]
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            # UDP connect não envia nada; só descobre qual interface está em uso
+            s.connect(("10.255.255.255", 1))
+            ip_local = s.getsockname()[0]
+        finally:
+            s.close()
+        partes = ip_local.split(".")
+        if len(partes) == 4 and ip_local != "0.0.0.0":
+            destinos.append(".".join(partes[:3] + ["255"]))
+    except OSError:
+        pass
+    return destinos
+
+
+def descobrir_servidor(tentativas=5, espera=1.0):
+    """Procura o app.py por UDP broadcast na rede local, com várias tentativas."""
     global SERVER_URL
 
     if SERVER_URL:
         return SERVER_URL
 
+    destinos = _destinos_broadcast()
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        sock.settimeout(1.5)
-        sock.sendto(DISCOVERY_REQUEST, ("255.255.255.255", DISCOVERY_PORT))
 
-        while True:
-            dados, _ = sock.recvfrom(1024)
-            texto = dados.decode("utf-8", errors="ignore").strip()
-            if not texto.startswith(DISCOVERY_RESPONSE_PREFIX):
-                continue
+        for _ in range(tentativas):
+            for destino in destinos:
+                try:
+                    sock.sendto(DISCOVERY_REQUEST, (destino, DISCOVERY_PORT))
+                except OSError:
+                    pass
 
-            partes = texto.split("|")
-            if len(partes) != 3:
-                continue
+            fim = time.monotonic() + espera
+            while True:
+                restante = fim - time.monotonic()
+                if restante <= 0:
+                    break
+                sock.settimeout(restante)
+                try:
+                    dados, _ = sock.recvfrom(1024)
+                except OSError:  # timeout: manda o broadcast de novo
+                    break
 
-            ip = partes[1].strip()
-            try:
-                porta = int(partes[2])
-            except ValueError:
-                porta = SERVER_PORT
+                texto = dados.decode("utf-8", errors="ignore").strip()
+                if not texto.startswith(DISCOVERY_RESPONSE_PREFIX):
+                    continue
 
-            if ip:
-                SERVER_URL = f"http://{ip}:{porta}"
-                return SERVER_URL
-    except OSError:
-        pass
+                partes = texto.split("|")
+                if len(partes) != 3:
+                    continue
+
+                ip = partes[1].strip()
+                try:
+                    porta = int(partes[2])
+                except ValueError:
+                    porta = SERVER_PORT
+
+                if ip:
+                    SERVER_URL = f"http://{ip}:{porta}"
+                    return SERVER_URL
     finally:
         sock.close()
 
     return ""
+
+
+def esquecer_servidor():
+    """Apaga o IP guardado, para a próxima chamada descobrir de novo."""
+    global SERVER_URL
+    SERVER_URL = ""
+
 
 
 def main(page: ft.Page):
