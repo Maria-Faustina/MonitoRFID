@@ -15,31 +15,26 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Configurar Java Estavel
+      - name: Configurar Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Instalar dependencias do Flet
+      - name: Instalar o Flet (mesma versao do pyproject.toml)
         run: |
           python -m pip install --upgrade pip
-          pip install flet pillow aiohttp requests python-socketio websocket-client
+          pip install "flet==1.0.5" pillow
 
-      - name: Configurar o Flutter SDK
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.22.2'
-
-      - name: Aceitar Licenças do Android
-        run: yes | flutter doctor --android-licenses
-
-      - name: Ajustar e Forçar o Ícone em PNG
+      - name: Conferir arquivos do projeto
         run: |
-          # Cria a pasta assets se não existir
+          ls -la
+          cat pyproject.toml
+          ls requirements.txt 2>/dev/null && echo "ATENCAO: existe requirements.txt" || true
+
+      - name: Gerar icone PNG quadrado
+        run: |
           mkdir -p assets
-          
-          # Script Python que abre sua logo e salva como um PNG quadrado perfeito (512x512)
           python -c "
           from PIL import Image
           import os
@@ -47,34 +42,13 @@ jobs:
               img = Image.open('assets/icons/logo.png').convert('RGBA')
               img = img.resize((512, 512), Image.Resampling.LANCZOS)
               img.save('assets/icon.png', 'PNG')
-              print('Ícone processado com sucesso em assets/icon.png')
+              print('Icone processado em assets/icon.png')
           else:
-              print('AVISO: assets/icons/logo.png não foi encontrada!')
+              print('AVISO: assets/icons/logo.png nao encontrada!')
           "
 
-      - name: Forçar a Compilação do APK
+      - name: Compilar o APK
         run: |
-          flutter config --no-analytics
-          
-          # Remove caches anteriores para evitar lixo de build que falhou
-          flet clean
-          rm -rf build/
-          rm -rf .pytest_cache/
-
-          # Cria o arquivo de requerimentos que o Flet lê caso não ache pyproject
-          echo "flet" > requirements.txt
-          echo "requests" >> requirements.txt
-          echo "aiohttp" >> requirements.txt
-          echo "pillow" >> requirements.txt
-          echo "python-socketio" >> requirements.txt
-          echo "websocket-client" >> requirements.txt
-
-          # Se o projeto possuir um pyproject.toml, injeta forçadamente a tabela de dependências mobile
-          if [ -f "pyproject.toml" ]; then
-            echo -e "\n[tool.flet.dependencies]\nrequests = \"*\"\naiohttp = \"*\"\npillow = \"*\"\npython-socketio = \"*\"\nwebsocket-client = \"*\"" >> pyproject.toml
-          fi
-
-          # Executa o build com o ícone embutido e a cor de fundo adaptativa do Android
           flet build apk --yes --verbose --android-adaptive-icon-background "#0E0E55"
 
       - name: Disponibilizar o arquivo APK para Download
@@ -82,3 +56,4 @@ jobs:
         with:
           name: app-release-apk
           path: build/apk/*.apk
+          if-no-files-found: error
