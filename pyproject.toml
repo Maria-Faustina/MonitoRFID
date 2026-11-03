@@ -2,8 +2,12 @@
 name = "MonitorRFID"
 version = "1.0.0"
 description = "Monitor RFID com Flet"
-product = "MonitorRFID"
-icon = "assets/icons/logo.png"
 dependencies = [
-    "flet>=0.25.0",
+    "flet==0.25.0",   # troque pela versão do pip show flet
+    "requests",
+    "python-socketio[client]",
+    "websocket-client",
 ]
+
+[tool.flet]
+product = "MonitorRFID"
