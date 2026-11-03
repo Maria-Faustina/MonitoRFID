@@ -326,7 +326,8 @@ def main(page: ft.Page):
                 estado["token"] = resp.json().get("token")
                 mostrar_aviso("Login realizado com sucesso!", "green")
                 await asyncio.sleep(1)
-                await page.push_route("/tela_home")
+                
+                page.run_task(page.push_route, "/tela_home")
             else:
                 mostrar_aviso("Usuário ou senha incorretos!", "red")
 
