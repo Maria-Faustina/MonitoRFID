@@ -1,223 +1,296 @@
 import asyncio
 import socket
-
 import flet as ft
 import requests
 import socketio
 
-SERVER_URL = ""  # preenchido pela descoberta (ou manualmente, como fallback)
+# O app tenta descobrir automaticamente o servidor na mesma rede Wi-Fi.
+# Se a descoberta falhar, SERVER_URL pode ser preenchido manualmente como fallback.
+SERVER_URL = "https://html-esp32.onrender.com"
+SERVER_PORT = 5000
 DISCOVERY_PORT = 5001
 DISCOVERY_REQUEST = b"MONITORRFID_DISCOVER"
+DISCOVERY_RESPONSE_PREFIX = "MONITORRFID_SERVER|"
 
 
 def descobrir_servidor():
-    """Procura o app.py por UDP broadcast na rede local."""
     global SERVER_URL
+
     if SERVER_URL:
         return SERVER_URL
 
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         sock.settimeout(1.5)
-        try:
-            sock.sendto(DISCOVERY_REQUEST, ("255.255.255.255", DISCOVERY_PORT))
+        sock.sendto(DISCOVERY_REQUEST, ("255.255.255.255", DISCOVERY_PORT))
+
+        while True:
             dados, _ = sock.recvfrom(1024)
-            _, ip, porta = dados.decode().strip().split("|")  # MONITORRFID_SERVER|ip|porta
-            SERVER_URL = f"http://{ip}:{porta}"
-        except (OSError, ValueError):
-            pass
-    return SERVER_URL
+            texto = dados.decode("utf-8", errors="ignore").strip()
+            if not texto.startswith(DISCOVERY_RESPONSE_PREFIX):
+                continue
+
+            partes = texto.split("|")
+            if len(partes) != 3:
+                continue
+
+            ip = partes[1].strip()
+            try:
+                porta = int(partes[2])
+            except ValueError:
+                porta = SERVER_PORT
+
+            if ip:
+                SERVER_URL = f"http://{ip}:{porta}"
+                return SERVER_URL
+    except OSError:
+        pass
+    finally:
+        sock.close()
+
+    return ""
 
 
 def main(page: ft.Page):
     page.title = "MonitorRFID"
     page.bgcolor = "#0E0E55"
     page.padding = 0
+    page.spacing = 0
     page.window.width = 350
     page.window.height = 700
+    page.vertical_alignment = ft.MainAxisAlignment.CENTER
+    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
 
     sio = socketio.Client(reconnection=True)
 
     # estado compartilhado entre as telas e os eventos do socket
-    estado = {"token": None, "historico": [], "lista": None, "txt_conexao": None}
+    estado = {
+        "token": None,
+        "historico": [],      # lista de dicts {uid, status, data_hora}
+        "lista": None,        # ft.ListView da tela home
+        "txt_conexao": None,  # ft.Text com o status da conexão
+    }
 
-    # ---------- componentes reutilizáveis ----------
+ 
     def mostrar_aviso(texto, cor):
-        page.show_dialog(ft.SnackBar(content=ft.Text(texto, color="#dedee7"), bgcolor=cor, duration=1500))
+        snack_bar = ft.SnackBar(
+            content=ft.Text(texto, color="#dedee7"),
+            bgcolor=cor,
+            duration=1500,
+        )
+        page.show_dialog(snack_bar)
         page.update()
 
-    def linha(a, b, c, cor_b="#dedee7", cabecalho=False):
-        """Linha de 3 colunas (UID | Status | Data Hora), usada no cabeçalho e nos registros."""
-        kw = dict(size=14, weight="bold") if cabecalho else dict(size=12)
-        celulas = [
-            ft.Text(t, color=cor, expand=e, text_align=ft.TextAlign.CENTER, **kw)
-            for t, cor, e in ((a, "#dedee7", 1), (b, cor_b, 2), (c, "#dedee7", 1))
-        ]
+    def linha_acesso(uid, status, dth):
+        liberado = str(status).lower() == "liberado"
+        cor_status = "#5ed97c" if liberado else "#ff6b6b"
+        
+        # Trata o UID para exibição amigável caso seja uma liberação manual do admin
+        uid_exibicao = "Painel Admin" if "MANUAL" in str(uid) else uid
+        
         return ft.Container(
             content=ft.Row(
-                celulas,
+                controls=[
+                    ft.Text(uid_exibicao, color="#dedee7", expand=1, size=12, text_align=ft.TextAlign.CENTER),
+                    ft.Text("Liberado" if liberado else "Negado", color=cor_status, expand=2, size=12, text_align=ft.TextAlign.CENTER),
+                    ft.Text(dth, color="#dedee7", expand=1, size=12, text_align=ft.TextAlign.CENTER),
+                ],
                 alignment=ft.MainAxisAlignment.SPACE_AROUND,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
             bgcolor="#263A6D",
             border_radius=3,
             padding=3,
-            margin=0 if cabecalho else 3,
+            margin=3,
         )
 
-    def linhas_historico():
-        controles = []
-        for r in estado["historico"]:
-            liberado = str(r["status"]).lower() == "liberado"
-            uid = "Painel Admin" if "MANUAL" in str(r["uid"]) else r["uid"]
-            controles.append(linha(uid, "Liberado" if liberado else "Negado", r["data_hora"],
-                                   "#5ed97c" if liberado else "#ff6b6b"))
-        return controles
 
-    def campo(dica, **kw):
-        return ft.TextField(
-            hint_text=dica,
-            hint_style=ft.TextStyle(size=10),
-            color="#090909",
-            bgcolor="#f0f0fc",
-            width=225,
-            height=38,
-            cursor_height=20,
-            border=ft.OutlineInputBorder(
-                border_radius=ft.BorderRadius.all(20),
-                side=ft.BorderSide(color="#f0f0fc"),
-            ),
-            **kw,
-        )
-
-    def nova_tela(rota, *controles):
-        page.views.append(
-            ft.View(
-                route=rota,
-                controls=list(controles),
-                bgcolor="#ABDCDC",
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                vertical_alignment=ft.MainAxisAlignment.CENTER,
-            )
-        )
-
-    # ---------- Socket.IO ----------
     def renderizar_lista():
-        if estado["lista"] is not None:
-            estado["lista"].controls = linhas_historico()
-            page.update()
+        lista = estado["lista"]
+        if lista is None:
+            return
+        lista.controls.clear()
+        for r in estado["historico"]:
+            lista.controls.append(linha_acesso(r["uid"], r["status"], r["data_hora"]))
+        page.update()
 
     def atualizar_conexao(conectado):
         txt = estado["txt_conexao"]
-        if txt is not None:
-            txt.value = "Servidor: conectado" if conectado else "Servidor: desconectado"
-            txt.color = "#2e7d32" if conectado else "#c62828"
-            page.update()
+        if txt is None:
+            return
+        txt.value = "Servidor: conectado" if conectado else "Servidor: desconectado"
+        txt.color = "#2e7d32" if conectado else "#c62828"
+        page.update()
 
+    # Socket.IO (cliente)
+   
+    @sio.on("connect")
+    def ao_conectar():
+        atualizar_conexao(True)
+
+    @sio.on("disconnect")
+    def ao_desconectar():
+        atualizar_conexao(False)
+
+    @sio.on("historico")
     def ao_receber_historico(lista):
         estado["historico"] = list(lista)[:5]
         renderizar_lista()
 
+    @sio.on("novo_acesso")
     def ao_novo_acesso(registro):
-        estado["historico"] = ([registro] + estado["historico"])[:5]
+        estado["historico"].insert(0, registro)
+        estado["historico"] = estado["historico"][:5]
         renderizar_lista()
 
-    sio.on("connect", lambda: atualizar_conexao(True))
-    sio.on("disconnect", lambda *_: atualizar_conexao(False))
-    sio.on("historico", ao_receber_historico)
-    sio.on("novo_acesso", ao_novo_acesso)
-    sio.on("erro", lambda msg: mostrar_aviso(str(msg), "red"))
+    @sio.on("erro")
+    def ao_erro(mensagem):
+        mostrar_aviso(str(mensagem), "red")
 
     def conectar_servidor():
         if sio.connected:
             return
 
         def _conectar():
+            global SERVER_URL
             try:
-                # se a descoberta falhar, a URL vazia gera erro e cai no except
-                sio.connect(descobrir_servidor(), auth={"token": estado["token"]}, wait_timeout=5)
+                if not SERVER_URL:
+                    SERVER_URL = descobrir_servidor()
+
+                if not SERVER_URL:
+                    atualizar_conexao(False)
+                    return
+
+                sio.connect(
+                    SERVER_URL,
+                    auth={"token": estado["token"]},
+                    wait_timeout=5,
+                )
             except Exception:
                 atualizar_conexao(False)
 
         page.run_thread(_conectar)
 
-    def liberar_acesso():
+    def liberar_acesso(e=None):
         if not sio.connected:
             mostrar_aviso("Sem conexão com o servidor. Tentando reconectar...", "red")
             conectar_servidor()
             return
-        sio.emit("liberar_acesso")  # o servidor registra e devolve "novo_acesso"
+        # o servidor registra e devolve "novo_acesso" para o app E para o front web
+        sio.emit("liberar_acesso")
 
-    def sair():
+    def sair(e=None):
         if sio.connected:
             sio.disconnect()
         estado["token"] = None
         page.run_task(page.push_route, "/tela_login")
+    def tela_home(e=None):
+        txt_painel = ft.Text(
+            "Painel de Entrada",
+            size=20,
+            weight="bold",
+            color="#0E0E55",
+        )
+        txt_conexao = ft.Text("Servidor: desconectado", size=12, color="#c62828")
+        estado["txt_conexao"] = txt_conexao
 
-    # ---------- telas ----------
-    def tela_home():
-        estado["txt_conexao"] = ft.Text("Servidor: desconectado", size=12, color="#c62828")
-        estado["lista"] = ft.ListView(controls=linhas_historico(), padding=0)
+        txt_registro = ft.Container(
+            ft.Text(
+                "Ultimos Acessos",
+                size=15,
+                weight="bold",
+                color="#dedee7",
+            ),
+            alignment=ft.Alignment.CENTER,
+        )
+        t_uid = ft.Text("UID", expand=1, text_align=ft.TextAlign.CENTER, size=14, weight="bold", color="#dedee7")
+        t_status = ft.Text("Status", expand=2, text_align=ft.TextAlign.CENTER, size=14, weight="bold", color="#dedee7")
+        t_dth = ft.Text("Data Hora", expand=1, text_align=ft.TextAlign.CENTER, size=14, weight="bold", color="#dedee7")
 
-        nova_tela(
-            "/tela_home",
-            ft.Container(
-                ft.Column(
-                    [ft.Text("Painel de Entrada", size=20, weight="bold", color="#0E0E55"), estado["txt_conexao"]],
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                    spacing=4,
-                ),
-                alignment=ft.Alignment.CENTER,
-                padding=40,
+        title_painel = ft.Container(
+            content=ft.Column(
+                [txt_painel, txt_conexao],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=4,
             ),
-            ft.Container(
-                ft.Column(
-                    [
-                        ft.Container(
-                            ft.Text("Ultimos Acessos", size=15, weight="bold", color="#dedee7"),
-                            alignment=ft.Alignment.CENTER,
-                        ),
-                        linha("UID", "Status", "Data Hora", cabecalho=True),
-                        estado["lista"],
-                    ],
-                    alignment=ft.MainAxisAlignment.CENTER,
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                ),
-                alignment=ft.Alignment.TOP_CENTER,
-                blur=ft.Blur(sigma_x=10, sigma_y=10, tile_mode=ft.BlurTileMode.MIRROR),
-                bgcolor="#0E3155",
-                margin=1,
-                padding=5,
-                border_radius=5,
-                width=320,
-                height=330,
-            ),
-            ft.Container(
-                ft.Button(
-                    on_click=liberar_acesso,
-                    content="Liberar acesso",
-                    icon=ft.Icons.LOCK_OPEN_SHARP,
-                    style=ft.ButtonStyle(
-                        side=ft.BorderSide(width=1, color="#CCCFD8"),
-                        shape=ft.RoundedRectangleBorder(radius=5),
-                    ),
-                    width=310,
-                    height=50,
-                    bgcolor="#e5e5f0",
-                    color="#529d65",
-                ),
-                alignment=ft.Alignment.CENTER,
-            ),
-            ft.Row([ft.IconButton(icon=ft.Icons.ARROW_BACK, icon_color="#263A6D", on_click=sair)]),
+            alignment=ft.Alignment.CENTER,
+            padding=40,
         )
 
+        linha_principal = ft.Container(
+            content=ft.Row(
+                controls=[t_uid, t_status, t_dth],
+                alignment=ft.MainAxisAlignment.SPACE_AROUND,
+                vertical_alignment=ft.CrossAxisAlignment.START,
+            ),
+            bgcolor="#263A6D",
+            border_radius=3,
+            padding=3,
+        )
+
+        btn_liberar = ft.Container(
+            ft.Button(
+                on_click=liberar_acesso,
+                content="Liberar acesso",
+                icon=ft.Icons.LOCK_OPEN_SHARP,
+                style=ft.ButtonStyle(
+                    side=ft.BorderSide(width=1, color="#CCCFD8"),
+                    shape=ft.RoundedRectangleBorder(radius=5),
+                ),
+                width=310,
+                height=50,
+                bgcolor="#e5e5f0",
+                color="#529d65",
+            ),
+            alignment=ft.Alignment.CENTER,
+        )
+        btn_voltar = ft.Row(
+            controls=[
+                ft.IconButton(
+                    icon=ft.Icons.ARROW_BACK,
+                    icon_color="#263A6D",
+                    on_click=sair,
+                )
+            ],
+            alignment=ft.MainAxisAlignment.START,
+        )
+        lista_dados = ft.ListView(padding=0, spacing=0)
+        estado["lista"] = lista_dados
+        for r in estado["historico"]:
+            lista_dados.controls.append(linha_acesso(r["uid"], r["status"], r["data_hora"]))
+        painel_fundo = ft.Container(
+            content=ft.Column(
+                controls=[txt_registro, linha_principal, lista_dados],
+                alignment=ft.MainAxisAlignment.CENTER,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            alignment=ft.Alignment.TOP_CENTER,
+            blur=ft.Blur(sigma_x=10, sigma_y=10, tile_mode=ft.BlurTileMode.MIRROR),
+            bgcolor="#0E3155",
+            margin=1,
+            padding=5,
+            border_radius=5,
+            width=320,
+            height=330,
+        )
+        page.views.append(
+            ft.View(
+                route="/tela_home",
+                controls=[title_painel, painel_fundo, btn_liberar, btn_voltar],
+                bgcolor="#ABDCDC",
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                vertical_alignment=ft.MainAxisAlignment.CENTER,
+            )
+        )
+        # entra na sala do servidor assim que a tela abre
         if sio.connected:
             atualizar_conexao(True)
         else:
             conectar_servidor()
 
-    def tela_login():
-        async def entrar():
+    def tela_login(e=None):
+        async def validacao_de_campo():
             if not (campo_email.value and campo_senha.value):
                 mostrar_aviso("Preencha todos os campos!", "red")
                 return
@@ -241,51 +314,92 @@ def main(page: ft.Page):
                 estado["token"] = resp.json().get("token")
                 mostrar_aviso("Login realizado com sucesso!", "green")
                 await asyncio.sleep(1)
+                
                 page.run_task(page.push_route, "/tela_home")
             else:
                 mostrar_aviso("Usuário ou senha incorretos!", "red")
 
-        campo_email = campo("Insira seu nome de usuario")
-        campo_senha = campo("Insira sua senha", password=True, can_reveal_password=True)
-
-        nova_tela(
-            "/tela_login",
-            ft.Container(
-                ft.Column(
-                    [
-                        ft.Text("MonitorRFID", size=30, weight="bold", color="#020230"),
-                        ft.Container(height=15),
-                        ft.Image(src="icons/logo_trans.png", width=65, height=65),
-                        ft.Container(height=20),
-                        campo_email,
-                        campo_senha,
-                        ft.Container(height=10),
-                        ft.Button(content="Fazer Login", on_click=entrar,
-                                  bgcolor="#f0f0fc", color="#030345", width=150, height=35),
-                    ],
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                    alignment=ft.MainAxisAlignment.CENTER,
-                    spacing=10,
-                ),
-                width=300,
-                height=400,
-                padding=30,
-                border_radius=12,
-                blur=ft.Blur(sigma_x=10, sigma_y=10, tile_mode=ft.BlurTileMode.MIRROR),
-                bgcolor="#43F0FDFF",
-                alignment=ft.Alignment.CENTER,
+        campo_email = ft.TextField(
+            hint_text="Insira seu nome de usuario",
+            hint_style=ft.TextStyle(size=10),
+            text_align=ft.TextAlign.LEFT,
+            color="#090909",
+            bgcolor="#f0f0fc",
+            width=225,
+            cursor_height=20,
+            height=38,
+            border=ft.OutlineInputBorder(
+                border_radius=ft.BorderRadius.all(20),
+                side=ft.BorderSide(color="#f0f0fc"),
             ),
         )
+        campo_senha = ft.TextField(
+            hint_text="Insira sua senha",
+            text_align=ft.TextAlign.LEFT,
+            password=True,
+            color="#090909",
+            can_reveal_password=True,
+            bgcolor="#f0f0fc",
+            hint_style=ft.TextStyle(size=10),
+            width=225,
+            cursor_height=20,
+            height=38,
+            border=ft.OutlineInputBorder(
+                border_radius=ft.BorderRadius.all(20),
+                side=ft.BorderSide(color="#f0f0fc"),
+            ),
+        )
+        painel_login = ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Text("MonitorRFID", size=30, weight="bold", color="#020230"),
+                    ft.Container(height=15),
+                    ft.Image(src="icons/logo_trans.png", width=65, height=65),
+                    ft.Container(height=20),
+                    campo_email,
+                    campo_senha,
+                    ft.Container(height=10),
+                    ft.Button(
+                        content="Fazer Login",
+                        on_click=validacao_de_campo,
+                        bgcolor="#f0f0fc",
+                        color="#030345",
+                        width=150,
+                        height=35,
+                    ),
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=10,
+            ),
+            width=300,
+            height=400,
+            padding=30,
+            border_radius=12,
+            blur=ft.Blur(sigma_x=10, sigma_y=10, tile_mode=ft.BlurTileMode.MIRROR),
+            bgcolor="#43F0FDFF",
+            alignment=ft.Alignment.CENTER,
+        )
 
-    telas = {"/tela_login": tela_login, "/tela_home": tela_home}
+        page.views.append(
+            ft.View(
+                route="/tela_login",
+                controls=[painel_login],
+                bgcolor="#ABDCDC",
+                vertical_alignment=ft.MainAxisAlignment.CENTER,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            )
+        )
 
     def troca_tela():
         page.views.clear()
-        if page.route in telas:
-            telas[page.route]()
+        if page.route == "/tela_login":
+            tela_login()
+        elif page.route == "/tela_home":
+            tela_home()
         page.update()
 
-    page.on_route_change = troca_tela
+    page.on_route_change = lambda: troca_tela()
     page.run_task(page.push_route, "/tela_login")
 
 
