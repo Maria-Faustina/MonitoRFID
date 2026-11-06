@@ -1,56 +1,9 @@
 import asyncio
-import socket
 import flet as ft
 import requests
 import socketio
 
-# O app tenta descobrir automaticamente o servidor na mesma rede Wi-Fi.
-# Se a descoberta falhar, SERVER_URL pode ser preenchido manualmente como fallback.
 SERVER_URL = "https://html-esp32.onrender.com"
-SERVER_PORT = 5000
-DISCOVERY_PORT = 5001
-DISCOVERY_REQUEST = b"MONITORRFID_DISCOVER"
-DISCOVERY_RESPONSE_PREFIX = "MONITORRFID_SERVER|"
-
-
-def descobrir_servidor():
-    global SERVER_URL
-
-    if SERVER_URL:
-        return SERVER_URL
-
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        sock.settimeout(1.5)
-        sock.sendto(DISCOVERY_REQUEST, ("255.255.255.255", DISCOVERY_PORT))
-
-        while True:
-            dados, _ = sock.recvfrom(1024)
-            texto = dados.decode("utf-8", errors="ignore").strip()
-            if not texto.startswith(DISCOVERY_RESPONSE_PREFIX):
-                continue
-
-            partes = texto.split("|")
-            if len(partes) != 3:
-                continue
-
-            ip = partes[1].strip()
-            try:
-                porta = int(partes[2])
-            except ValueError:
-                porta = SERVER_PORT
-
-            if ip:
-                SERVER_URL = f"http://{ip}:{porta}"
-                return SERVER_URL
-    except OSError:
-        pass
-    finally:
-        sock.close()
-
-    return ""
-
 
 def main(page: ft.Page):
     page.title = "MonitorRFID"
@@ -64,12 +17,11 @@ def main(page: ft.Page):
 
     sio = socketio.Client(reconnection=True)
 
-    # estado compartilhado entre as telas e os eventos do socket
     estado = {
         "token": None,
-        "historico": [],      # lista de dicts {uid, status, data_hora}
-        "lista": None,        # ft.ListView da tela home
-        "txt_conexao": None,  # ft.Text com o status da conexão
+        "historico": [],      
+        "lista": None,        
+        "txt_conexao": None, 
     }
 
  
@@ -151,17 +103,9 @@ def main(page: ft.Page):
     def conectar_servidor():
         if sio.connected:
             return
-
+ 
         def _conectar():
-            global SERVER_URL
             try:
-                if not SERVER_URL:
-                    SERVER_URL = descobrir_servidor()
-
-                if not SERVER_URL:
-                    atualizar_conexao(False)
-                    return
-
                 sio.connect(
                     SERVER_URL,
                     auth={"token": estado["token"]},
@@ -169,7 +113,7 @@ def main(page: ft.Page):
                 )
             except Exception:
                 atualizar_conexao(False)
-
+ 
         page.run_thread(_conectar)
 
     def liberar_acesso(e=None):
@@ -179,7 +123,6 @@ def main(page: ft.Page):
             return
         # o servidor registra e devolve "novo_acesso" para o app E para o front web
         sio.emit("liberar_acesso")
-
     def sair(e=None):
         if sio.connected:
             sio.disconnect()
@@ -290,12 +233,12 @@ def main(page: ft.Page):
             conectar_servidor()
 
     def tela_login(e=None):
+       
         async def validacao_de_campo():
             if not (campo_email.value and campo_senha.value):
                 mostrar_aviso("Preencha todos os campos!", "red")
                 return
-
-            servidor = await asyncio.to_thread(descobrir_servidor)
+            servidor = SERVER_URL
             if not servidor:
                 mostrar_aviso("Servidor não encontrado na rede Wi-Fi", "red")
                 return
