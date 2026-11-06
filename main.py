@@ -39,7 +39,7 @@ def main(page: ft.Page):
         cor_status = "#5ed97c" if liberado else "#ff6b6b"
         
         # Trata o UID para exibição amigável caso seja uma liberação manual do admin
-        uid_exibicao = "Painel Admin" if "MANUAL" in str(uid) else uid
+        uid_exibicao = "Painel Admin" if "USUARIO" in str(uid) else uid
         
         return ft.Container(
             content=ft.Row(
